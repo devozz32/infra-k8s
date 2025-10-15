@@ -1,8 +1,8 @@
 # ============================================
 # Global Settings
 # ============================================
-global:
-  namespace: default
+# Note: namespace is determined by helm install/upgrade -n <namespace>
+# Do not set it here!
 
 # ============================================
 # Image Registry & Tags

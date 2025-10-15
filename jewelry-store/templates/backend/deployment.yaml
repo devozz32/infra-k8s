@@ -3,7 +3,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.backend.name }}-deployment
-  namespace: {{ .Values.global.namespace }}
   labels:
     app: {{ .Values.backend.name }}
 spec:
