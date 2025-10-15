@@ -1,0 +1,58 @@
+{{- if .Values.authService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.authService.name }}-deployment
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.authService.name }}
+spec:
+  replicas: {{ .Values.authService.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.authService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.authService.name }}
+    spec:
+      containers:
+      - name: auth
+        image: "{{ .Values.image.registry }}/{{ .Values.authService.image.repository }}:{{ .Values.image.authTag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.authService.service.targetPort }}
+          name: http
+          protocol: TCP
+        
+        # Environment Variables from ConfigMap (if any)
+        {{- if .Values.authService.env }}
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.authService.name }}-config
+        {{- end }}
+        
+        # JWT Secret (from Secret)
+        env:
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: JWT_SECRET_KEY
+        
+        # Resource Limits
+        resources:
+          {{- toYaml .Values.authService.resources | nindent 10 }}
+        
+        # Liveness Probe
+        {{- with .Values.authService.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        
+        # Readiness Probe
+        {{- with .Values.authService.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+{{- end }}

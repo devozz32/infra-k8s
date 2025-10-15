@@ -1,0 +1,222 @@
+# ============================================
+# Global Settings
+# ============================================
+global:
+  namespace: default
+
+# ============================================
+# Image Registry & Tags
+# ============================================
+image:
+  registry: localhost:8082
+  pullPolicy: Always
+  # Tags will be set by Jenkins via --set
+  frontendTag: latest
+  backendTag: latest
+  authTag: latest
+
+# ============================================
+# JWT Secret (injected from Jenkins)
+# ============================================
+jwtSecret:
+  # ⚠️ This will be set by Jenkins: --set jwtSecret.key="your-secret"
+  # DO NOT hardcode the secret here!
+  key: ""
+
+# ============================================
+# Frontend Service (React + NGINX)
+# ============================================
+frontend:
+  enabled: true
+  name: frontend
+  
+  image:
+    repository: jewelry-store
+  
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  
+  # Ingress Configuration
+  ingress:
+    enabled: true
+    className: nginx
+    host: jewelry-store.local
+    path: /
+    pathType: Prefix
+    annotations: {}
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    tls:
+      enabled: false
+      secretName: jewelry-store-tls
+  
+  # Persistent Volume for NGINX
+  persistence:
+    enabled: true
+    storageClass: standard  # For minikube
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    mountPath: /usr/share/nginx/html
+  
+  # Environment Variables (from docker-compose)
+  env:
+    REACT_APP_API_BASE_URL: "http://backend-service:8000/api"
+    REACT_APP_AUTH_BASE_URL: "http://auth-service:8001"
+    REACT_APP_BACKEND_HOST: "backend-service"
+    REACT_APP_BACKEND_PORT: "8000"
+  
+  # Resource Limits
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  
+  # Liveness Probe
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Readiness Probe
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Horizontal Pod Autoscaler
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 70
+
+# ============================================
+# Backend Service (FastAPI)
+# ============================================
+backend:
+  enabled: true
+  name: backend
+  
+  image:
+    repository: jewelry-backend
+  
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  # Environment Variables (from docker-compose)
+  env:
+    AUTH_SERVICE_URL: "http://auth-service:8001"
+  
+  # Resource Limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  
+  # Liveness Probe
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Readiness Probe
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Horizontal Pod Autoscaler
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 70
+
+# ============================================
+# Auth Service (FastAPI)
+# ============================================
+authService:
+  enabled: true
+  name: auth-service
+  
+  image:
+    repository: jewelry-auth
+  
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+  
+  # Environment Variables (from docker-compose)
+  env: {}
+    # No additional env vars needed besides JWT_SECRET_KEY
+  
+  # Resource Limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  
+  # Liveness Probe
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Readiness Probe
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8001
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Horizontal Pod Autoscaler
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 70

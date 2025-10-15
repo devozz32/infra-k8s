@@ -1,0 +1,204 @@
+pipeline {
+    agent { label 'docker_agent' }
+
+    environment {
+        // Registry Configuration
+        REGISTRY_URL = "localhost:8082"
+        
+        // Kubernetes Configuration
+        NAMESPACE = "default"
+        HELM_RELEASE_NAME = "jewelry-store"
+        
+        // Image Tags - using BUILD_NUMBER
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        
+        // JWT Secret - should come from Jenkins Credentials
+        // Create a "Secret text" credential in Jenkins with ID: 'JWT_SECRET_KEY'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    echo "Building version: ${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Build & Push Images') {
+            parallel {
+                stage('Build Frontend') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Building Frontend Image..."
+                                docker build -t ${REGISTRY_URL}/jewelry-store:${IMAGE_TAG} ./jewelry-store
+                                docker push ${REGISTRY_URL}/jewelry-store:${IMAGE_TAG}
+                                echo "✅ Frontend image pushed: ${REGISTRY_URL}/jewelry-store:${IMAGE_TAG}"
+                            """
+                        }
+                    }
+                }
+                
+                stage('Build Backend') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Building Backend Image..."
+                                docker build -t ${REGISTRY_URL}/jewelry-backend:${IMAGE_TAG} ./backend
+                                docker push ${REGISTRY_URL}/jewelry-backend:${IMAGE_TAG}
+                                echo "✅ Backend image pushed: ${REGISTRY_URL}/jewelry-backend:${IMAGE_TAG}"
+                            """
+                        }
+                    }
+                }
+                
+                stage('Build Auth Service') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Building Auth Service Image..."
+                                docker build -t ${REGISTRY_URL}/jewelry-auth:${IMAGE_TAG} ./auth-service
+                                docker push ${REGISTRY_URL}/jewelry-auth:${IMAGE_TAG}
+                                echo "✅ Auth Service image pushed: ${REGISTRY_URL}/jewelry-auth:${IMAGE_TAG}"
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy with Helm') {
+            steps {
+                script {
+                    // Get JWT Secret from Jenkins Credentials
+                    withCredentials([string(credentialsId: 'JWT_SECRET_KEY', variable: 'JWT_SECRET')]) {
+                        sh """
+                            echo "🚀 Deploying Jewelry Store with Helm..."
+                            
+                            # Deploy/Upgrade with Helm
+                            helm upgrade --install ${HELM_RELEASE_NAME} ./helm-chart \\
+                                --namespace ${NAMESPACE} \\
+                                --create-namespace \\
+                                --set image.registry=${REGISTRY_URL} \\
+                                --set image.frontendTag=${IMAGE_TAG} \\
+                                --set image.backendTag=${IMAGE_TAG} \\
+                                --set image.authTag=${IMAGE_TAG} \\
+                                --set jwtSecret.key="${JWT_SECRET}" \\
+                                --wait \\
+                                --timeout 10m \\
+                                --atomic
+                            
+                            echo "✅ Helm deployment completed!"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    sh """
+                        echo "📊 Verifying deployment..."
+                        
+                        echo "=== Deployments ==="
+                        kubectl get deployments -n ${NAMESPACE} -l app.kubernetes.io/instance=${HELM_RELEASE_NAME}
+                        
+                        echo ""
+                        echo "=== Pods ==="
+                        kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/instance=${HELM_RELEASE_NAME}
+                        
+                        echo ""
+                        echo "=== Services ==="
+                        kubectl get services -n ${NAMESPACE} -l app.kubernetes.io/instance=${HELM_RELEASE_NAME}
+                        
+                        echo ""
+                        echo "=== Ingress ==="
+                        kubectl get ingress -n ${NAMESPACE}
+                        
+                        echo ""
+                        echo "=== HPA ==="
+                        kubectl get hpa -n ${NAMESPACE}
+                        
+                        echo ""
+                        echo "✅ Verification completed!"
+                    """
+                }
+            }
+        }
+
+        stage('Check Pod Health') {
+            steps {
+                script {
+                    sh """
+                        echo "🔍 Checking pod health..."
+                        
+                        # Wait for all pods to be ready
+                        kubectl wait --for=condition=ready pod \\
+                            -l app.kubernetes.io/instance=${HELM_RELEASE_NAME} \\
+                            -n ${NAMESPACE} \\
+                            --timeout=5m
+                        
+                        echo "✅ All pods are healthy!"
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                echo """
+                ========================================
+                ✅ DEPLOYMENT SUCCESSFUL!
+                ========================================
+                Release: ${HELM_RELEASE_NAME}
+                Version: ${IMAGE_TAG}
+                Namespace: ${NAMESPACE}
+                
+                Images deployed:
+                - Frontend: ${REGISTRY_URL}/jewelry-store:${IMAGE_TAG}
+                - Backend:  ${REGISTRY_URL}/jewelry-backend:${IMAGE_TAG}
+                - Auth:     ${REGISTRY_URL}/jewelry-auth:${IMAGE_TAG}
+                
+                Next steps:
+                1. Access the application via Ingress
+                2. Monitor pods: kubectl get pods -n ${NAMESPACE}
+                3. View logs: kubectl logs -l app.kubernetes.io/instance=${HELM_RELEASE_NAME} -n ${NAMESPACE}
+                ========================================
+                """
+            }
+        }
+        
+        failure {
+            script {
+                echo "❌ Deployment failed! Rolling back..."
+                sh """
+                    # Helm atomic flag will auto-rollback on failure
+                    # But we can also manually rollback if needed:
+                    # helm rollback ${HELM_RELEASE_NAME} -n ${NAMESPACE}
+                    
+                    echo "Checking pod status:"
+                    kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/instance=${HELM_RELEASE_NAME}
+                    
+                    echo ""
+                    echo "Recent events:"
+                    kubectl get events -n ${NAMESPACE} --sort-by='.lastTimestamp' | tail -20
+                """
+            }
+        }
+        
+        always {
+            script {
+                // Cleanup old images (optional)
+                sh """
+                    echo "Cleaning up old Docker images..."
+                    docker system prune -f || true
+                """
+            }
+        }
+    }
+}

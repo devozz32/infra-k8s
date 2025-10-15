@@ -1,0 +1,19 @@
+{{- if .Values.authService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.authService.name }}-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: {{ .Values.authService.name }}
+spec:
+  type: {{ .Values.authService.service.type }}
+  selector:
+    app: {{ .Values.authService.name }}
+  ports:
+  - name: http
+    protocol: TCP
+    port: {{ .Values.authService.service.port }}
+    targetPort: {{ .Values.authService.service.targetPort }}
+  sessionAffinity: ClientIP
+{{- end }}
