@@ -71,9 +71,12 @@ frontend:
       memory: "256Mi"
       cpu: "500m"
 
+  # ============================================
+  # ✅ FIXED PROBES (to prevent 403 from Nginx)
+  # ============================================
   livenessProbe:
     httpGet:
-      path: /
+      path: /index.html
       port: 80
     initialDelaySeconds: 30
     periodSeconds: 10
@@ -82,7 +85,7 @@ frontend:
 
   readinessProbe:
     httpGet:
-      path: /
+      path: /index.html
       port: 80
     initialDelaySeconds: 10
     periodSeconds: 5
