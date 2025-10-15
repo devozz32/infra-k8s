@@ -50,12 +50,9 @@ frontend:
       enabled: false
       secretName: jewelry-store-tls
 
+  # PVC מבוטל לחלוטין
   persistence:
-    enabled: true
-    storageClass: standard
-    accessMode: ReadWriteOnce
-    size: 1Gi
-    mountPath: /usr/share/nginx/html
+    enabled: false
 
   env:
     REACT_APP_API_BASE_URL: "http://backend-service:8000/api"
@@ -72,7 +69,7 @@ frontend:
       cpu: "500m"
 
   # ============================================
-  # ✅ FIXED PROBES (to prevent 403 from Nginx)
+  # ✅ Fixed probes (avoid NGINX 403/404)
   # ============================================
   livenessProbe:
     httpGet:
