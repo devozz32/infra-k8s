@@ -1,16 +1,16 @@
 # ============================================
 # Global Settings
 # ============================================
-# Note: namespace is determined by helm install/upgrade -n <namespace>
-# Do not set it here!
+# Note: namespace נקבע על ידי הפקודה של helm install/upgrade
+# אין צורך להגדיר כאן.
 
 # ============================================
 # Image Registry & Tags
 # ============================================
 image:
-  registry: localhost:8082
+  registry: docker.io/talko32
   pullPolicy: Always
-  # Tags will be set by Jenkins via --set
+  # ערכים אלו יוחלפו על ידי Jenkins בזמן פריסה
   frontendTag: latest
   backendTag: latest
   authTag: latest
@@ -19,8 +19,7 @@ image:
 # JWT Secret (injected from Jenkins)
 # ============================================
 jwtSecret:
-  # ⚠️ This will be set by Jenkins: --set jwtSecret.key="your-secret"
-  # DO NOT hardcode the secret here!
+  # ⚠️ הסוד מוזרק על ידי Jenkins
   key: ""
 
 # ============================================
@@ -29,18 +28,17 @@ jwtSecret:
 frontend:
   enabled: true
   name: frontend
-  
+
   image:
-    repository: jewelry-store
-  
+    repository: store-frontend
+
   replicaCount: 2
-  
+
   service:
     type: ClusterIP
     port: 80
     targetPort: 80
-  
-  # Ingress Configuration
+
   ingress:
     enabled: true
     className: nginx
@@ -48,27 +46,23 @@ frontend:
     path: /
     pathType: Prefix
     annotations: {}
-      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
     tls:
       enabled: false
       secretName: jewelry-store-tls
-  
-  # Persistent Volume for NGINX
+
   persistence:
     enabled: true
-    storageClass: standard  # For minikube
+    storageClass: standard
     accessMode: ReadWriteOnce
     size: 1Gi
     mountPath: /usr/share/nginx/html
-  
-  # Environment Variables (from docker-compose)
+
   env:
     REACT_APP_API_BASE_URL: "http://backend-service:8000/api"
     REACT_APP_AUTH_BASE_URL: "http://auth-service:8001"
     REACT_APP_BACKEND_HOST: "backend-service"
     REACT_APP_BACKEND_PORT: "8000"
-  
-  # Resource Limits
+
   resources:
     requests:
       memory: "128Mi"
@@ -76,8 +70,7 @@ frontend:
     limits:
       memory: "256Mi"
       cpu: "500m"
-  
-  # Liveness Probe
+
   livenessProbe:
     httpGet:
       path: /
@@ -86,8 +79,7 @@ frontend:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
-  # Readiness Probe
+
   readinessProbe:
     httpGet:
       path: /
@@ -96,8 +88,7 @@ frontend:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-  
-  # Horizontal Pod Autoscaler
+
   hpa:
     enabled: true
     minReplicas: 2
@@ -111,22 +102,20 @@ frontend:
 backend:
   enabled: true
   name: backend
-  
+
   image:
-    repository: jewelry-backend
-  
+    repository: store-backend
+
   replicaCount: 2
-  
+
   service:
     type: ClusterIP
     port: 8000
     targetPort: 8000
-  
-  # Environment Variables (from docker-compose)
+
   env:
     AUTH_SERVICE_URL: "http://auth-service:8001"
-  
-  # Resource Limits
+
   resources:
     requests:
       memory: "256Mi"
@@ -134,8 +123,7 @@ backend:
     limits:
       memory: "512Mi"
       cpu: "1000m"
-  
-  # Liveness Probe
+
   livenessProbe:
     httpGet:
       path: /
@@ -144,8 +132,7 @@ backend:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
-  # Readiness Probe
+
   readinessProbe:
     httpGet:
       path: /
@@ -154,8 +141,7 @@ backend:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-  
-  # Horizontal Pod Autoscaler
+
   hpa:
     enabled: true
     minReplicas: 2
@@ -169,22 +155,19 @@ backend:
 authService:
   enabled: true
   name: auth-service
-  
+
   image:
-    repository: jewelry-auth
-  
+    repository: store-auth
+
   replicaCount: 2
-  
+
   service:
     type: ClusterIP
     port: 8001
     targetPort: 8001
-  
-  # Environment Variables (from docker-compose)
+
   env: {}
-    # No additional env vars needed besides JWT_SECRET_KEY
-  
-  # Resource Limits
+
   resources:
     requests:
       memory: "256Mi"
@@ -192,8 +175,7 @@ authService:
     limits:
       memory: "512Mi"
       cpu: "1000m"
-  
-  # Liveness Probe
+
   livenessProbe:
     httpGet:
       path: /
@@ -202,8 +184,7 @@ authService:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
-  # Readiness Probe
+
   readinessProbe:
     httpGet:
       path: /
@@ -212,8 +193,7 @@ authService:
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-  
-  # Horizontal Pod Autoscaler
+
   hpa:
     enabled: true
     minReplicas: 2
